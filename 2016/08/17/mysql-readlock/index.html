@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>mysql readlock | Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="这里是官方介绍文档
+
+#需求在一个事务中进行insert 或者update操作时，另外一个事务可以对同样的行进行update或者delete。  InnoDB 提供两种读锁提供保护。
+
+SELECT ... LOCK IN SHARE MODE 对读取的行加锁，其他的会话可以读这些行，但是不能修改这些行。 如果另一个会话已经修改了要读的行，那么你的读操作就需要等待直到另一个会话的修改操作comm">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql readlock">
+<meta property="og:url" content="http://yoursite.com/2016/08/17/mysql-readlock/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="这里是官方介绍文档
+
+#需求在一个事务中进行insert 或者update操作时，另外一个事务可以对同样的行进行update或者delete。  InnoDB 提供两种读锁提供保护。
+
+SELECT ... LOCK IN SHARE MODE 对读取的行加锁，其他的会话可以读这些行，但是不能修改这些行。 如果另一个会话已经修改了要读的行，那么你的读操作就需要等待直到另一个会话的修改操作comm">
+<meta property="og:updated_time" content="2016-08-17T22:57:42.553Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="mysql readlock">
+<meta name="twitter:description" content="这里是官方介绍文档
+
+#需求在一个事务中进行insert 或者update操作时，另外一个事务可以对同样的行进行update或者delete。  InnoDB 提供两种读锁提供保护。
+
+SELECT ... LOCK IN SHARE MODE 对读取的行加锁，其他的会话可以读这些行，但是不能修改这些行。 如果另一个会话已经修改了要读的行，那么你的读操作就需要等待直到另一个会话的修改操作comm">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+
+</head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-mysql-readlock" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2016/08/17/mysql-readlock/" class="article-date">
+  <time datetime="2016-08-17T13:45:38.000Z" itemprop="datePublished">2016-08-17</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/IT技术/">IT技术</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      mysql readlock
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <blockquote>
+<p><a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-locking-reads.html" target="_blank" rel="external">这里是官方介绍文档</a></p>
+</blockquote>
+<p>#需求<br>在一个事务中进行<code>insert</code> 或者<code>update</code>操作时，另外一个事务可以对同样的行进行<code>update</code>或者<code>delete</code>。  InnoDB 提供两种读锁提供保护。</p>
+<ul>
+<li><code>SELECT ... LOCK IN SHARE MODE</code> 对读取的行加锁，其他的会话可以读这些行，但是不能修改这些行。 如果另一个会话已经修改了要读的行，那么你的读操作就需要等待直到另一个会话的修改操作commit</li>
+<li><code>SELECT ... FOR UPDATE</code> 会将相关的行及索引锁定。其他的update事务会阻塞。 并且不能同时在多个事务中使用<code>FOR UPDATE</code></li>
+</ul>
+<p><code>必须</code>set autocommit=0<code>或者</code>start transaction<code>，两种锁才会有效</code></p>
+<p>下面是进行实验的例子<br>首先创建一个表格，并插入若干的数据<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">CREATE TABLE IF NOT EXISTS `test1`(</div><div class="line">     `a` INT NOT NULL AUTO PRIMARY KEY,</div><div class="line">     `B` INT NOT NULL</div><div class="line">)ENGINE=InnoDB</div><div class="line">DEFAULT CHARACTER SET = utf8</div><div class="line">COLLATE = utf8_general_ci;</div><div class="line"></div><div class="line">INSERT INTO `test1` VALUES(NULL, 1);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 2);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 3);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 4);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 5);</div></pre></td></tr></table></figure></p>
+<p>1.<code>SELECT ... LOCK IN SHARE MODE</code> 一个事务申请之后，另外一个会话仍然可读，但是不能修改<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">session1 &gt; BEGIN;</div><div class="line">session1 &gt; SELECT * FROM `test1` WHERE `a` = 1 LOCK IN SHARE MODE; #在另一个会话中可读</div><div class="line">session2 &gt;  SELECT * FROM `test1` WHERE `a` = 1;  #可以返回结果</div><div class="line">session2 &gt; UPDATE `test1` SET `b` = 2 WHERE `a` = 1; #error,无法修改，除非事务提交</div><div class="line">session1 &gt; commit;</div></pre></td></tr></table></figure></p>
+<p>2.<code>SELECT ... LOCK IN SHARE MODE</code> 可以同时在两个事务中申请共享锁, 但是FOR UPDATE就不行<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">session1 &gt; BEGIN;</div><div class="line">session1 &gt; UPDATE `test1` SET `b` = 2 WHERE `a` = 1;</div><div class="line">session2 &gt; BEGIN;</div><div class="line">session2 &gt; SELECT * FROM `test1` WHERE `a` = 1 LOCK IN SHARE MODE;#会在次数一直阻塞，直到session1提交了会话</div></pre></td></tr></table></figure></p>
+<p>3.现在的<code>mvcc</code>通过写时复制技术，实现了 读读，读写，写读的串行。<br>如何查看是否使用了<code>mvcc</code>技术呢？</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">session 1 &gt; BEGIN;</div><div class="line">session 1 &gt; SELECT * FROM  `test1` WHERE `a` = 1;</div><div class="line">+---+---+</div><div class="line">| a | b |</div><div class="line">+---+---+</div><div class="line">| 1 | 2 |</div><div class="line">+---+---+</div><div class="line"></div><div class="line">session2 &gt; UPDATE `test1` SET `b` = 3 WHERE `a`=1;</div><div class="line"></div><div class="line">session2 &gt; COMMIT;</div><div class="line"></div><div class="line">session 1 &gt; SELECT * FROM `test1` WHERE `a` = 1;   #结果并没有改变，因为复制了一份</div><div class="line">+---+---+</div><div class="line">| a | b |</div><div class="line">+---+---+</div><div class="line">| 1 | 2 |</div><div class="line">+---+---+</div></pre></td></tr></table></figure>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2016/08/17/mysql-readlock/" data-id="cirzi37zc0000b046of9ie3xg" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/mysql/">mysql</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2016/08/15/hello-world/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">Hello World</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/IT技术/">IT技术</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/mysql/">mysql</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/mysql/" style="font-size: 10px;">mysql</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2016/08/17/mysql-readlock/">mysql readlock</a>
+          </li>
+        
+          <li>
+            <a href="/2016/08/15/hello-world/">Hello World</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2016 John Doe<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+  </div>
+</body>
+</html>

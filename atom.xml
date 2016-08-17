@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Hexo</title>
+  
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="http://yoursite.com/"/>
+  <updated>2016-08-17T22:57:42.553Z</updated>
+  <id>http://yoursite.com/</id>
+  
+  <author>
+    <name>John Doe</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>mysql readlock</title>
+    <link href="http://yoursite.com/2016/08/17/mysql-readlock/"/>
+    <id>http://yoursite.com/2016/08/17/mysql-readlock/</id>
+    <published>2016-08-17T13:45:38.000Z</published>
+    <updated>2016-08-17T22:57:42.553Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote>
+<p><a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-locking-reads.html" target="_blank" rel="external">这里是官方介绍文档</a></p>
+</blockquote>
+<p>#需求<br>在一个事务中进行<code>insert</code> 或者<code>update</code>操作时，另外一个事务可以对同样的行进行<code>update</code>或者<code>delete</code>。  InnoDB 提供两种读锁提供保护。</p>
+<ul>
+<li><code>SELECT ... LOCK IN SHARE MODE</code> 对读取的行加锁，其他的会话可以读这些行，但是不能修改这些行。 如果另一个会话已经修改了要读的行，那么你的读操作就需要等待直到另一个会话的修改操作commit</li>
+<li><code>SELECT ... FOR UPDATE</code> 会将相关的行及索引锁定。其他的update事务会阻塞。 并且不能同时在多个事务中使用<code>FOR UPDATE</code></li>
+</ul>
+<p><code>必须</code>set autocommit=0<code>或者</code>start transaction<code>，两种锁才会有效</code></p>
+<p>下面是进行实验的例子<br>首先创建一个表格，并插入若干的数据<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">CREATE TABLE IF NOT EXISTS `test1`(</div><div class="line">     `a` INT NOT NULL AUTO PRIMARY KEY,</div><div class="line">     `B` INT NOT NULL</div><div class="line">)ENGINE=InnoDB</div><div class="line">DEFAULT CHARACTER SET = utf8</div><div class="line">COLLATE = utf8_general_ci;</div><div class="line"></div><div class="line">INSERT INTO `test1` VALUES(NULL, 1);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 2);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 3);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 4);</div><div class="line">INSERT INTO `test1` VALUES(NULL, 5);</div></pre></td></tr></table></figure></p>
+<p>1.<code>SELECT ... LOCK IN SHARE MODE</code> 一个事务申请之后，另外一个会话仍然可读，但是不能修改<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">session1 &gt; BEGIN;</div><div class="line">session1 &gt; SELECT * FROM `test1` WHERE `a` = 1 LOCK IN SHARE MODE; #在另一个会话中可读</div><div class="line">session2 &gt;  SELECT * FROM `test1` WHERE `a` = 1;  #可以返回结果</div><div class="line">session2 &gt; UPDATE `test1` SET `b` = 2 WHERE `a` = 1; #error,无法修改，除非事务提交</div><div class="line">session1 &gt; commit;</div></pre></td></tr></table></figure></p>
+<p>2.<code>SELECT ... LOCK IN SHARE MODE</code> 可以同时在两个事务中申请共享锁, 但是FOR UPDATE就不行<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">session1 &gt; BEGIN;</div><div class="line">session1 &gt; UPDATE `test1` SET `b` = 2 WHERE `a` = 1;</div><div class="line">session2 &gt; BEGIN;</div><div class="line">session2 &gt; SELECT * FROM `test1` WHERE `a` = 1 LOCK IN SHARE MODE;#会在次数一直阻塞，直到session1提交了会话</div></pre></td></tr></table></figure></p>
+<p>3.现在的<code>mvcc</code>通过写时复制技术，实现了 读读，读写，写读的串行。<br>如何查看是否使用了<code>mvcc</code>技术呢？</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">session 1 &gt; BEGIN;</div><div class="line">session 1 &gt; SELECT * FROM  `test1` WHERE `a` = 1;</div><div class="line">+---+---+</div><div class="line">| a | b |</div><div class="line">+---+---+</div><div class="line">| 1 | 2 |</div><div class="line">+---+---+</div><div class="line"></div><div class="line">session2 &gt; UPDATE `test1` SET `b` = 3 WHERE `a`=1;</div><div class="line"></div><div class="line">session2 &gt; COMMIT;</div><div class="line"></div><div class="line">session 1 &gt; SELECT * FROM `test1` WHERE `a` = 1;   #结果并没有改变，因为复制了一份</div><div class="line">+---+---+</div><div class="line">| a | b |</div><div class="line">+---+---+</div><div class="line">| 1 | 2 |</div><div class="line">+---+---+</div></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      &lt;blockquote&gt;
+&lt;p&gt;&lt;a href=&quot;http://dev.mysql.com/doc/refman/5.6/en/innodb-locking-reads.html&quot; target=&quot;_blank&quot; rel=&quot;external&quot;&gt;这里是官方介绍文档&lt;/a&gt;&lt;/p&gt;
+
+    
+    </summary>
+    
+      <category term="IT技术" scheme="http://yoursite.com/categories/IT%E6%8A%80%E6%9C%AF/"/>
+    
+    
+      <category term="mysql" scheme="http://yoursite.com/tags/mysql/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>Hello World</title>
+    <link href="http://yoursite.com/2016/08/15/hello-world/"/>
+    <id>http://yoursite.com/2016/08/15/hello-world/</id>
+    <published>2016-08-15T06:36:58.051Z</published>
+    <updated>2016-08-15T06:36:58.051Z</updated>
+    
+    <content type="html"><![CDATA[<p>Welcome to <a href="https://hexo.io/" target="_blank" rel="external">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="external">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="external">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="external">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ hexo new <span class="string">"My New Post"</span></div></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="external">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ hexo server</div></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="external">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ hexo generate</div></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="external">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$ hexo deploy</div></pre></td></tr></table></figure>
+<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="external">Deployment</a></p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;Welcome to &lt;a href=&quot;https://hexo.io/&quot; target=&quot;_blank&quot; rel=&quot;external&quot;&gt;Hexo&lt;/a&gt;! This is your very first post. Check &lt;a href=&quot;https://hexo.
+    
+    </summary>
+    
+    
+  </entry>
+  
+</feed>
